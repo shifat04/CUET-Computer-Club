@@ -6,6 +6,7 @@ const connectDB = async () => {
         console.log('✅ MongoDB connected');
     } catch (error) {
         console.error('❌ MongoDB connection failed:', error.message);
+        console.error('ℹ️ Check your MONGO_URI in backend/.env (local MongoDB or MongoDB Atlas URI).');
         process.exit(1);
     }
 };

@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL =
+    window.CUET_API_BASE_URL ||
+    `${window.location.protocol}//${window.location.hostname}:5000/api`;
 const ADMIN_TOKEN_KEY = 'adminToken';
 const escapeHtml = (value) =>
     String(value)
@@ -42,6 +44,7 @@ if (loginForm) {
 
 const dashboard = document.getElementById('adminDashboard');
 if (dashboard) {
+    const cardsById = new Map();
     const adminInfo = document.getElementById('adminInfo');
     const cardForm = document.getElementById('cardForm');
     const cardsTableBody = document.getElementById('cardsTableBody');
@@ -82,8 +85,10 @@ if (dashboard) {
 
     const renderCards = (cards) => {
         cardsTableBody.innerHTML = '';
+        cardsById.clear();
 
         cards.forEach((card) => {
+            cardsById.set(card._id, card);
             const row = document.createElement('tr');
             const safeFeatures = (card.features || []).map((feature) => escapeHtml(feature)).join(', ');
             row.innerHTML = `
@@ -136,12 +141,15 @@ if (dashboard) {
         }
 
         if (action === 'edit') {
-            const row = button.closest('tr');
-            const [iconCell, titleCell, descriptionCell, featuresCell] = row.querySelectorAll('td');
-            document.getElementById('icon').value = iconCell.textContent.trim();
-            document.getElementById('title').value = titleCell.textContent.trim();
-            document.getElementById('description').value = descriptionCell.textContent.trim();
-            document.getElementById('features').value = featuresCell.textContent.trim();
+            const card = cardsById.get(cardId);
+            if (!card) {
+                alert('Unable to load card details for editing');
+                return;
+            }
+            document.getElementById('icon').value = card.icon || '';
+            document.getElementById('title').value = card.title || '';
+            document.getElementById('description').value = card.description || '';
+            document.getElementById('features').value = (card.features || []).join(', ');
             cardIdInput.value = cardId;
             submitButton.textContent = 'Update Card';
         }

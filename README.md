@@ -17,6 +17,8 @@
 4. Update `.env` values:
    - `MONGO_URI` = your MongoDB connection string
    - `JWT_SECRET` = strong random secret
+   - `CORS_ORIGIN` = comma-separated frontend origins (for example `http://127.0.0.1:8080,http://localhost:8080`)
+   - `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` = API rate limit settings
 5. Run backend:
    ```bash
    npm run dev

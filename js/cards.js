@@ -1,4 +1,7 @@
 const cardsGrid = document.querySelector('.activities-grid');
+const API_BASE_URL =
+    window.CUET_API_BASE_URL ||
+    `${window.location.protocol}//${window.location.hostname}:5000/api`;
 const escapeHtml = (value) =>
     String(value)
         .replaceAll('&', '&amp;')
@@ -8,7 +11,7 @@ const escapeHtml = (value) =>
         .replaceAll("'", '&#39;');
 
 if (cardsGrid) {
-    fetch('http://localhost:5000/api/cards')
+    fetch(`${API_BASE_URL}/cards`)
         .then((response) => response.json())
         .then((cards) => {
             if (!Array.isArray(cards) || cards.length === 0) {

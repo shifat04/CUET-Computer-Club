@@ -45,9 +45,17 @@ const updateCard = async (req, res) => {
         return res.status(404).json({ message: 'Card not found' });
     }
 
-    card.icon = icon || card.icon;
-    card.title = title || card.title;
-    card.description = description || card.description;
+    if (icon !== undefined) {
+        card.icon = icon;
+    }
+
+    if (title !== undefined) {
+        card.title = title;
+    }
+
+    if (description !== undefined) {
+        card.description = description;
+    }
     if (features !== undefined) {
         card.features = normalizeFeatures(features);
     }
