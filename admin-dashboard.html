@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - CUET Computer Club</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .admin-section { padding: 120px 0 60px; }
+        .admin-box { background: rgba(26,26,46,.9); border: 1px solid rgba(255,255,255,.1); border-radius: 20px; padding: 24px; margin-bottom: 20px; }
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .admin-table th, .admin-table td { border: 1px solid rgba(255,255,255,.15); padding: 8px; text-align: left; vertical-align: top; }
+        .admin-table button { margin-right: 8px; padding: 6px 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="index.html" class="logo">
+                    <img src="assert/cuet_logo.png" alt="CUET Computer Club Logo" class="logo-icon">
+                    <span class="logo-text">CUET Computer Club</span>
+                </a>
+            </div>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="admin-dashboard.html" class="nav-link btn-login active">Dashboard</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="admin-section" id="adminDashboard">
+        <div class="section-container">
+            <div class="admin-box">
+                <h2 class="form-title">Admin Dashboard</h2>
+                <p id="adminInfo" class="form-subtitle"></p>
+                <button id="logoutButton" class="btn btn-secondary">Logout</button>
+            </div>
+
+            <div class="admin-box">
+                <h3 class="form-title">Create / Update Card</h3>
+                <form id="cardForm" class="contact-form">
+                    <input type="hidden" id="cardId">
+                    <div class="form-group">
+                        <label for="icon" class="form-label">Icon (emoji)</label>
+                        <input id="icon" class="form-input" placeholder="💻">
+                    </div>
+                    <div class="form-group">
+                        <label for="title" class="form-label">Title</label>
+                        <input id="title" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea id="description" class="form-textarea" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="features" class="form-label">Features (comma separated)</label>
+                        <input id="features" class="form-input" placeholder="Feature 1, Feature 2">
+                    </div>
+                    <button id="submitButton" type="submit" class="btn btn-primary">Add Card</button>
+                </form>
+            </div>
+
+            <div class="admin-box">
+                <h3 class="form-title">All Cards</h3>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Icon</th>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Features</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cardsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>
