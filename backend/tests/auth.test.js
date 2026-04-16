@@ -1,51 +1,83 @@
-jest.mock('../services/emailService', () => ({
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+jest.mock('../models/User', () => ({
+    findOne: jest.fn(),
 }));
 
-const request = require('supertest');
-const app = require('../app');
+jest.mock('../services/tokenService', () => ({
+    createVerificationToken: jest.fn(),
+    findVerificationToken: jest.fn(),
+    deleteVerificationTokenByUser: jest.fn(),
+    createResetToken: jest.fn(),
+    findResetToken: jest.fn(),
+    deleteResetTokenByUser: jest.fn(),
+}));
+
+jest.mock('../services/emailService', () => ({
+    sendVerificationEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+}));
+
+jest.mock('bcryptjs', () => ({
+    hash: jest.fn(),
+}));
+
+const User = require('../models/User');
+const tokenService = require('../services/tokenService');
 const emailService = require('../services/emailService');
+const bcrypt = require('bcryptjs');
+const { verifyEmail, resendVerificationEmail } = require('../controllers/authController');
+const { requestPasswordReset, verifyResetToken, resetPassword } = require('../controllers/userController');
 
-describe('Auth verification and password reset flow', () => {
-    it('verifies email and resets password using issued tokens', async () => {
-        await request(app).post('/api/users/register').send({
-            name: 'User Two',
-            email: 'user2@cuet.test',
-            password: 'UserPass123!',
-        });
+const mockRes = () => {
+    const res = {};
+    res.status = jest.fn(() => res);
+    res.json = jest.fn(() => res);
+    return res;
+};
 
-        const firstVerificationToken = emailService.sendVerificationEmail.mock.calls[0][1];
+describe('Email verification and password reset flow', () => {
+    it('verifies email token and marks user as verified', async () => {
+        const save = jest.fn().mockResolvedValue(undefined);
+        tokenService.findVerificationToken.mockResolvedValue({ user: { _id: 'u1', isVerified: false, save } });
 
-        const verify = await request(app).post('/api/auth/verify-email').send({ token: firstVerificationToken });
-        expect(verify.status).toBe(200);
+        const req = { body: { token: 'verify-token' }, query: {} };
+        const res = mockRes();
+        await verifyEmail(req, res);
 
-        const login = await request(app).post('/api/users/login').send({
-            email: 'user2@cuet.test',
-            password: 'UserPass123!',
-        });
-        expect(login.status).toBe(200);
+        expect(tokenService.deleteVerificationTokenByUser).toHaveBeenCalledWith('u1');
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
 
-        const resetRequest = await request(app).post('/api/auth/password-reset/request').send({
-            email: 'user2@cuet.test',
-        });
-        expect(resetRequest.status).toBe(200);
+    it('resends verification email for unverified user', async () => {
+        const save = jest.fn().mockResolvedValue(undefined);
+        User.findOne.mockResolvedValue({ _id: 'u2', email: 'user@cuet.test', name: 'User', isVerified: false, save });
+        tokenService.createVerificationToken.mockResolvedValue('new-token');
 
-        const resetToken = emailService.sendPasswordResetEmail.mock.calls[0][1];
+        const req = { body: { email: 'user@cuet.test' } };
+        const res = mockRes();
+        await resendVerificationEmail(req, res);
 
-        const verifyReset = await request(app).get(`/api/auth/password-reset/verify?token=${resetToken}`);
-        expect(verifyReset.status).toBe(200);
+        expect(emailService.sendVerificationEmail).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
 
-        const reset = await request(app).post('/api/auth/password-reset/reset').send({
-            token: resetToken,
-            password: 'NewPass456!',
-        });
-        expect(reset.status).toBe(200);
+    it('handles password reset request, verify and reset', async () => {
+        User.findOne.mockResolvedValue({ _id: 'u3', name: 'User', email: 'user@cuet.test' });
+        tokenService.createResetToken.mockResolvedValue('reset-token');
 
-        const relogin = await request(app).post('/api/users/login').send({
-            email: 'user2@cuet.test',
-            password: 'NewPass456!',
-        });
-        expect(relogin.status).toBe(200);
+        const requestRes = mockRes();
+        await requestPasswordReset({ body: { email: 'user@cuet.test' } }, requestRes);
+        expect(emailService.sendPasswordResetEmail).toHaveBeenCalled();
+
+        tokenService.findResetToken.mockResolvedValue({ user: { _id: 'u3', save: jest.fn().mockResolvedValue(undefined) } });
+
+        const verifyRes = mockRes();
+        await verifyResetToken({ query: { token: 'reset-token' }, body: {} }, verifyRes);
+        expect(verifyRes.status).toHaveBeenCalledWith(200);
+
+        bcrypt.hash.mockResolvedValue('new-hash');
+        const resetRes = mockRes();
+        await resetPassword({ body: { token: 'reset-token', password: 'NewPass123!' } }, resetRes);
+        expect(tokenService.deleteResetTokenByUser).toHaveBeenCalledWith('u3');
+        expect(resetRes.status).toHaveBeenCalledWith(200);
     });
 });

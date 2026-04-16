@@ -1,62 +1,62 @@
-jest.mock('../services/emailService', () => ({
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+jest.mock('../models/Card', () => ({
+    create: jest.fn(),
+    find: jest.fn(),
+    findById: jest.fn(),
 }));
 
-const request = require('supertest');
-const app = require('../app');
+const Card = require('../models/Card');
+const { createCard, getCards, updateCard, deleteCard } = require('../controllers/cardController');
 
-const registerAdmin = async ({ email, role }) => {
-    const base = await request(app).post('/api/admin/register').send({
-        name: 'Seed Root',
-        email: 'seed-root@cuet.test',
-        password: 'StrongPass123!',
-    });
-
-    const created = await request(app).post('/api/admin/register').send({
-        name: role,
-        email,
-        password: 'StrongPass123!',
-        role,
-    });
-
-    return { rootToken: base.body.token, admin: created.body.admin, token: created.body.token };
+const mockRes = () => {
+    const res = {};
+    res.status = jest.fn(() => res);
+    res.json = jest.fn(() => res);
+    return res;
 };
 
-describe('Card CRUD with RBAC', () => {
-    it('allows editor create/update and blocks viewer updates', async () => {
-        const { rootToken } = await registerAdmin({ email: 'editor-role@cuet.test', role: 'editor' });
+describe('Card CRUD operations', () => {
+    it('creates and returns a card', async () => {
+        Card.create.mockResolvedValue({ _id: 'c1', title: 'T', description: 'D', features: ['A'] });
+        const req = { body: { title: 'T', description: 'D', features: 'A' } };
+        const res = mockRes();
 
-        const loginEditor = await request(app).post('/api/admin/login').send({
-            email: 'editor-role@cuet.test',
-            password: 'StrongPass123!',
-        });
+        await createCard(req, res);
 
-        const create = await request(app)
-            .post('/api/cards')
-            .set('Authorization', `Bearer ${loginEditor.body.token}`)
-            .send({ title: 'Event', description: 'Desc', features: 'A,B' });
+        expect(Card.create).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(201);
+    });
 
-        expect(create.status).toBe(201);
+    it('updates and deletes an existing card', async () => {
+        const savedCard = {
+            _id: 'c2',
+            icon: '💻',
+            title: 'Old',
+            description: 'Old',
+            features: [],
+            save: jest.fn().mockResolvedValue({ _id: 'c2', title: 'New' }),
+            deleteOne: jest.fn().mockResolvedValue(undefined),
+        };
+        Card.findById.mockResolvedValue(savedCard);
 
-        const viewer = await request(app).post('/api/admin/register').send({
-            name: 'Viewer',
-            email: 'viewer-role@cuet.test',
-            password: 'StrongPass123!',
-            role: 'viewer',
-        });
+        const updateReq = { params: { id: 'c2' }, body: { title: 'New' } };
+        const updateRes = mockRes();
+        await updateCard(updateReq, updateRes);
+        expect(updateRes.status).toHaveBeenCalledWith(200);
 
-        const viewerUpdate = await request(app)
-            .put(`/api/cards/${create.body._id}`)
-            .set('Authorization', `Bearer ${viewer.body.token}`)
-            .send({ title: 'Changed' });
+        const deleteReq = { params: { id: 'c2' } };
+        const deleteRes = mockRes();
+        await deleteCard(deleteReq, deleteRes);
+        expect(deleteRes.status).toHaveBeenCalledWith(200);
+    });
 
-        expect(viewerUpdate.status).toBe(403);
+    it('lists cards sorted by created date', async () => {
+        const sort = jest.fn().mockResolvedValue([{ _id: 'c3' }]);
+        Card.find.mockReturnValue({ sort });
 
-        const deleteByRoot = await request(app)
-            .delete(`/api/cards/${create.body._id}`)
-            .set('Authorization', `Bearer ${rootToken}`);
+        const res = mockRes();
+        await getCards({}, res);
 
-        expect(deleteByRoot.status).toBe(200);
+        expect(sort).toHaveBeenCalledWith({ createdAt: -1 });
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 });

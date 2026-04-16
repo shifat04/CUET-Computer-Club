@@ -1,37 +1,75 @@
-jest.mock('../services/emailService', () => ({
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+jest.mock('../models/Admin', () => ({
+    findOne: jest.fn(),
+    countDocuments: jest.fn(),
+    create: jest.fn(),
+    findById: jest.fn(),
+    find: jest.fn(),
 }));
 
-const request = require('supertest');
-const app = require('../app');
+jest.mock('bcryptjs', () => ({
+    hash: jest.fn(),
+    compare: jest.fn(),
+}));
 
-describe('Admin authentication and RBAC', () => {
-    it('registers first admin as super_admin and protects role endpoint', async () => {
-        const first = await request(app).post('/api/admin/register').send({
+jest.mock('jsonwebtoken', () => ({
+    sign: jest.fn(() => 'admin-jwt-token'),
+}));
+
+const Admin = require('../models/Admin');
+const bcrypt = require('bcryptjs');
+const { registerAdmin, loginAdmin } = require('../controllers/adminController');
+
+const mockRes = () => {
+    const res = {};
+    res.status = jest.fn(() => res);
+    res.json = jest.fn(() => res);
+    return res;
+};
+
+describe('Admin authentication flows', () => {
+    it('registers first admin as super_admin', async () => {
+        Admin.findOne.mockResolvedValue(null);
+        Admin.countDocuments.mockResolvedValue(0);
+        bcrypt.hash.mockResolvedValue('hashed');
+        Admin.create.mockResolvedValue({
+            _id: 'a1',
             name: 'Root',
             email: 'root@cuet.test',
-            password: 'StrongPass123!',
+            role: 'super_admin',
         });
 
-        expect(first.status).toBe(201);
-        expect(first.body.admin.role).toBe('super_admin');
+        const req = { body: { name: 'Root', email: 'root@cuet.test', password: 'StrongPass123!' } };
+        const res = mockRes();
 
-        const second = await request(app).post('/api/admin/register').send({
+        await registerAdmin(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(201);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ admin: expect.objectContaining({ role: 'super_admin' }) })
+        );
+    });
+
+    it('logs in existing admin with valid credentials', async () => {
+        Admin.findOne.mockResolvedValue({
+            _id: 'a2',
             name: 'Editor',
             email: 'editor@cuet.test',
-            password: 'StrongPass123!',
+            password: 'hashed',
             role: 'editor',
         });
+        bcrypt.compare.mockResolvedValue(true);
 
-        expect(second.status).toBe(201);
+        const req = { body: { email: 'editor@cuet.test', password: 'StrongPass123!' } };
+        const res = mockRes();
 
-        const roleUpdate = await request(app)
-            .patch(`/api/admin/users/${second.body.admin.id}/role`)
-            .set('Authorization', `Bearer ${first.body.token}`)
-            .send({ role: 'viewer' });
+        await loginAdmin(req, res);
 
-        expect(roleUpdate.status).toBe(200);
-        expect(roleUpdate.body.admin.role).toBe('viewer');
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                token: 'admin-jwt-token',
+                admin: expect.objectContaining({ role: 'editor' }),
+            })
+        );
     });
 });

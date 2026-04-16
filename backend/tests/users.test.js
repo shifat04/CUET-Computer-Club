@@ -1,35 +1,87 @@
-jest.mock('../services/emailService', () => ({
-    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+jest.mock('../models/User', () => ({
+    findOne: jest.fn(),
+    create: jest.fn(),
+    find: jest.fn(),
+    findById: jest.fn(),
 }));
 
-const request = require('supertest');
-const app = require('../app');
+jest.mock('bcryptjs', () => ({
+    hash: jest.fn(),
+    compare: jest.fn(),
+}));
+
+jest.mock('jsonwebtoken', () => ({
+    sign: jest.fn(() => 'user-jwt-token'),
+}));
+
+jest.mock('../services/tokenService', () => ({
+    createVerificationToken: jest.fn(),
+    createResetToken: jest.fn(),
+    findResetToken: jest.fn(),
+    deleteResetTokenByUser: jest.fn(),
+}));
+
+jest.mock('../services/emailService', () => ({
+    sendVerificationEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+}));
+
 const User = require('../models/User');
-const VerificationToken = require('../models/VerificationToken');
+const bcrypt = require('bcryptjs');
+const tokenService = require('../services/tokenService');
+const emailService = require('../services/emailService');
+const { registerUser, loginUser } = require('../controllers/userController');
 
-describe('User registration and verification guards', () => {
-    it('registers user, creates verification token and blocks login before verification', async () => {
-        const register = await request(app).post('/api/users/register').send({
-            name: 'User One',
-            email: 'user1@cuet.test',
-            password: 'UserPass123!',
-            studentId: '1900123',
+const mockRes = () => {
+    const res = {};
+    res.status = jest.fn(() => res);
+    res.json = jest.fn(() => res);
+    return res;
+};
+
+describe('User registration and verification checks', () => {
+    it('registers user and sends verification email', async () => {
+        User.findOne.mockResolvedValue(null);
+        bcrypt.hash.mockResolvedValue('hashed-pass');
+        const save = jest.fn().mockResolvedValue(undefined);
+        User.create.mockResolvedValue({
+            _id: 'u1',
+            name: 'User',
+            email: 'user@cuet.test',
+            studentId: '1900',
+            isVerified: false,
+            verificationSentAt: null,
+            save,
         });
+        tokenService.createVerificationToken.mockResolvedValue('verify-token');
+        emailService.sendVerificationEmail.mockResolvedValue(undefined);
 
-        expect(register.status).toBe(201);
-        expect(register.body.user.isVerified).toBe(false);
+        const req = {
+            body: {
+                name: 'User',
+                email: 'user@cuet.test',
+                password: 'UserPass123!',
+                studentId: '1900',
+            },
+        };
+        const res = mockRes();
 
-        const user = await User.findOne({ email: 'user1@cuet.test' });
-        const token = await VerificationToken.findOne({ user: user._id });
+        await registerUser(req, res);
 
-        expect(token).toBeTruthy();
+        expect(tokenService.createVerificationToken).toHaveBeenCalledWith('u1');
+        expect(emailService.sendVerificationEmail).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(201);
+    });
 
-        const login = await request(app).post('/api/users/login').send({
-            email: 'user1@cuet.test',
-            password: 'UserPass123!',
-        });
+    it('blocks login when user email is not verified', async () => {
+        User.findOne.mockResolvedValue({ password: 'hashed', isVerified: false });
+        bcrypt.compare.mockResolvedValue(true);
 
-        expect(login.status).toBe(403);
+        const req = { body: { email: 'user@cuet.test', password: 'UserPass123!' } };
+        const res = mockRes();
+
+        await loginUser(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
     });
 });
