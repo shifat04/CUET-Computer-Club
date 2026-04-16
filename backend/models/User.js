@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const adminSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
     {
         name: {
             type: String,
@@ -14,19 +14,25 @@ const adminSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        studentId: {
+            type: String,
+            trim: true,
+            default: '',
+        },
         password: {
             type: String,
             required: true,
-            minlength: 8,
-        },
-        role: {
-            type: String,
-            enum: ['super_admin', 'editor', 'viewer'],
-            default: 'viewer',
+            minlength: 6,
         },
         isVerified: {
             type: Boolean,
-            default: true,
+            default: false,
+        },
+        verificationSentAt: {
+            type: Date,
+        },
+        lastLoginAt: {
+            type: Date,
         },
     },
     {
@@ -34,4 +40,4 @@ const adminSchema = new mongoose.Schema(
     }
 );
 
-module.exports = mongoose.model('Admin', adminSchema);
+module.exports = mongoose.model('User', userSchema);

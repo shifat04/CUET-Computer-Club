@@ -1,0 +1,9 @@
+.git
+.github
+node_modules
+backend/node_modules
+npm-debug.log
+Dockerfile*
+*.md
+.env
+backend/.env
